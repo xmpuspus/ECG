@@ -108,4 +108,5 @@ dependencies:
   - statsmodels==0.6.1
   - theano==0.8.2
   - toolz==0.8.0
+  - wfdb==0.1.2
   - wcwidth==0.1.7
