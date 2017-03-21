@@ -61,7 +61,7 @@ dependencies:
 - pip:
   - backports.shutil-get-terminal-size==1.0.0
   - beautifulsoup4==4.5.1
-  - biosppy==0.2.2
+  - biosppy==0.3.0
   - boto3==1.4.0
   - botocore==1.4.48
   - cffi==1.8.2
