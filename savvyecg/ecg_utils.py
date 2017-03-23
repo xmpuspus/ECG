@@ -323,7 +323,7 @@ def heart_rate(r_peaks, fs, unit = 'persec'):
     hr = 1/np.nanmean(dt) *multiplier[unit]
     return hr
 
-def heart_rate_var(r_peaks, fs, unit = {'ms'}):
+def heart_rate_var(r_peaks, fs, unit = 'ms'):
     """
     Calculate heart rate from the location of R peaks
     
@@ -352,5 +352,21 @@ def heart_rate_var(r_peaks, fs, unit = {'ms'}):
     hrv = np.nanstd(dt)*multiplier[unit]
     return hrv
     
+## dividing the whole signal into segments
+def array_rolling_window(a, window):
+    shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
+    strides = a.strides + (a.strides[-1],)
+    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
 
+def divide_segments(a, window, overlap = 0):
+    window = int(window)
+    rolled = array_rolling_window(a, window)
+    slide_by = int(window*(1-overlap))
+    return rolled[0::slide_by]
 
+def ecg_beats(sig, rpeaks, fs, dt = 100e-3):
+    width = int(dt * fs)
+    total_time = len(sig)/fs
+    beats = [(r, sig[int(r - width): int(r + width)]) for r in rpeaks 
+             if ((r - width) >0 and (r + width)< len(sig))]
+    return beats
