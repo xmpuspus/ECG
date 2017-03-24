@@ -383,6 +383,30 @@ def ecg_beats(sig, rpeaks, fs, dt = 100e-3):
 
 
 def EDR_all(ecgs, rpeaks_idxs, peak_count_nz):
+    """
+    Calculate EDR for segmented ecg signal with its respective rpeak locations.
+    Difference with edr() is that this function interpolates with respect to the
+    maximum number of rpeaks in the segmented ecg signal.
+    
+    Parameters
+    ----------
+    ecgs: array_like
+        2D array containing segmented ECG signal
+        
+    rpeaks_idxs: array_like
+        Array containing indices of the R peaks in the segmented ECG signal  
+    
+    peak_count_nz: array_like
+        Array containing the number of R peak locations for each segment of the
+        segmented ECG signal
+        
+    Returns
+    -------
+    EDR: array_like
+        Array containing ECG-derived respiration per segment
+        
+    """  
+      
     EDR_list = []
     for i in range(rpeaks_idxs.shape[0]):
         
@@ -397,27 +421,129 @@ def EDR_all(ecgs, rpeaks_idxs, peak_count_nz):
         EDR_list.append(edr_)
     EDR = np.array(EDR_list)
     return EDR
+
 def iqr(x):
+    """
+    Calculate inter-quartile range
+    
+    Parameters
+    ----------
+    x: array_like
+        Array containing numbers for IQR
+        
+    Returns
+    -------
+    iqr: float
+        Inter-quartile Range
+        
+    """ 
     q75, q25 = np.percentile(x, [75 ,25])
     iqr = q75 - q25
     return iqr
 
 def mad(x):
+    """
+    Calculate mean absolute deviation
+    
+    Parameters
+    ----------
+    x: array_like
+        Array containing numbers for MAD
+        
+    Returns
+    -------
+    mad: float
+        mean absolute deviation
+        
+    """ 
+    
     mean_x = np.mean(x)
     mean_adj = np.abs(x - mean_x)
-    return np.mean(mean_adj)
+    mad = np.mean(mean_adj)
+    return mad
+
 def sample_entropy(a):
-    return np.abs(a[2] - a).max(axis=0)
+    """
+    Calculate 2nd order sample entropy
+    
+    Parameters
+    ----------
+    a: array_like
+        Array containing numbers to calculate sample entropy
+        
+    Returns
+    -------
+    sp: float
+        sample entropy
+        
+    """ 
+    sp = np.abs(a[2] - a).max(axis=0)
+    return sp
 
 def segment_ecg(ecg, segment_size = 60, f = 100):
+    """
+    Segment ECG signal
+    
+    Parameters
+    ----------
+    ecg: array_like
+        1D Array containing amplitude of ECG signal
+        
+        
+    segment_size: int, optional 
+        Specifies segment length (15-sec, 30-sec, or 60-sec)
+        
+    f: float, optional
+        Number corresponding to the sampling frequency of the input signal,
+        must be in Hertz
+       
+    Returns
+    -------
+    ecg_segmented: array_like
+        Estimate of the heart rate variability
+        
+    """ 
+    
     ecg[ecg < 0.01] = 0.01
     ecg_len = ecg.shape
     divs =int(ecg_len[0] /(segment_size * f))
     ecg_new = baseline_correct(ecg, f)
     windowed_ecg = np.array_split(ecg_new[:divs * segment_size * f], divs)  
-    return np.array([i for i in windowed_ecg if len(i) == len(windowed_ecg[0])])
+    ecg_segmented = np.array([i for i in windowed_ecg if len(i) == len(windowed_ecg[0])])
+    return ecg_segmented
     
 def calculate_features(ecg_wind, rpeaks, peak_count_new, RR_int, f = 100):
+    """
+    Calculate features for detecting sleep apnea
+    
+    The features contain statistical measures, morphology and periodogram
+    of the ECG signal.
+       
+    Parameters
+    ----------
+    ecgs_wind: array_like
+        2D array containing segmented ECG signal
+        
+    rpeaks: array_like
+        Array containing indices of the R peaks in the segmented ECG signal  
+    
+    peak_count_new: array_like
+        Array containing the number of R peak locations for each segment of the
+        segmented ECG signal
+        
+    RR_int: array_like
+        Array containing RR intervals
+        
+    f: float, optional
+        Number corresponding to the sampling frequency of the input signal,
+        must be in Hertz
+           
+    Returns
+    -------
+    X: array_like
+        Features
+        
+    """ 
     n = 5e-2  #in seconds
     edr_sig = EDR_all(ecg_wind, rpeaks, peak_count_new)
     mean_RR = np.array(list(map(np.mean, RR_int)))
