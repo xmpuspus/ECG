@@ -3,6 +3,11 @@ import pandas as pd
 import os
 import pickle
 from .ecg_utils import *
+import scipy.signal as ss
+from sklearn.externals import joblib as jl
+from biosppy.signals import ecg as ecgsig
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 class Signal():
     def __init__(self, data, fs, hpass_cor_freq_hz=0.5, lpass_cor_freq_hz=40):
@@ -95,3 +100,105 @@ class Signal():
             self.beats_df = pd.DataFrame({'segment_id': self.segments_df.index.values,
                                          'beat_rpeak': beats_rp, 'beat_mag': beats_mag}).set_index('segment_id')
         return self
+    
+    
+    
+###################################################
+###################################################
+
+#Models
+vfib_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/VFIB_Classifier.sav')
+afib_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/AFIB_Classifier.sav')
+pac_pvc_bbbb_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/PAC_PVC_BBBB_Classifier.sav')
+apnea_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/Apnea_Classifier.sav')
+
+def predict_vfib_per_beat(beat):
+    prediction = vfib_model.predict(beat)
+    return prediction
+    
+    
+def predict_vfib(ecg, f = 250):
+    window = int(f * 0.4) #800ms beat
+    ecg_new = baseline_correct(ecg, f)
+    rpeaks = np.array(ecgsig.hamilton_segmenter(ecg_new, f)['rpeaks'])[2:-2] #detect rpeaks from ecg
+    beats = np.array([ecg_new[i - window: i + window] for i in rpeaks])
+    pca = PCA(n_components=10)
+    beats_new = pca.fit_transform(beats)
+    #beats_new = StandardScaler().fit_transform(beats_new)
+    predictions = predict_vfib_per_beat(beats_new)
+    dict_all = {}
+    dict_all['beats'] = beats
+    dict_all['PCA beats'] = beats_new
+    dict_all['predictions'] = predictions
+    
+    return dict_all
+
+def predict_afib_per_beat(beat):
+    prediction = afib_model.predict(beat)
+    return prediction
+
+
+def predict_afib(ecg, f = 120):
+    window = int(f * 0.4) #800ms beat
+    ecg_new = baseline_correct(ecg, f)
+    rpeaks = np.array(ecgsig.hamilton_segmenter(ecg_new, f)['rpeaks'])[2:-2] #detect rpeaks from ecg
+    beats = np.array([ecg_new[i - window: i + window] for i in rpeaks])
+    pca = PCA(n_components=20)
+    beats_new = pca.fit_transform(beats)
+    beats_new = StandardScaler().fit_transform(beats_new)
+    predictions = predict_afib_per_beat(beats_new)
+    dict_all = {}
+    dict_all['beats'] = beats
+    dict_all['PCA beats'] = beats_new
+    dict_all['predictions'] = predictions
+    
+    return dict_all
+
+
+def predict_pac_pvc_bbbb_per_beat(beat):
+    prediction = pac_pvc_bbbb_model.predict(beat)
+    return prediction
+
+
+def predict_pac_pvc_bbbb(ecg, f = 250):
+    window = int(f * 0.4) #800ms beat
+    ecg_new = baseline_correct(ecg, f)
+    rpeaks = np.array(ecgsig.hamilton_segmenter(ecg_new, f)['rpeaks'])[2:-2] #detect rpeaks from ecg
+    beats = np.array([ecg_new[i - window: i + window] for i in rpeaks])
+    pca = PCA(n_components=10)
+    beats_new = pca.fit_transform(beats)
+    beats_new = StandardScaler().fit_transform(beats_new)
+    predictions = predict_pac_pvc_bbbb_per_beat(beats_new)
+    dict_all = {}
+    dict_all['beats'] = beats
+    dict_all['PCA beats'] = beats_new
+    dict_all['predictions'] = predictions
+    return dict_all
+
+def predict_apnea_per_segment(segment):
+    prediction = apnea_model.predict(segment)
+    return prediction
+
+
+def predict_apnea(ecg, f = 100, segment_size = 60):
+    
+    window = int(f * segment_size) #800ms beat
+    ecg_wind  = segment_ecg(ecg, segment_size = segment_size, f = f)
+    rpeaks = np.array([ecgsig.hamilton_segmenter(i, f)['rpeaks'] for i in ecg_wind]) #detect rpeaks from ecg    
+    RR_int = np.array([np.diff(i) for i in rpeaks])
+    peak_count = np.array([len(i) for i in rpeaks])
+    
+    #remove segments without detectable rpeaks
+    n_peaks = 30
+    ecg_wind = ecg_wind[np.where(peak_count > n_peaks)]
+    RR_int = RR_int[np.where(peak_count > n_peaks)]
+    rpeaks = rpeaks[np.where(peak_count > n_peaks)]
+    peak_count_new = peak_count[np.where(peak_count > n_peaks)]
+    #features
+    X = calculate_features(ecg_wind, rpeaks, peak_count_new, RR_int, f = f)
+    X_c = StandardScaler().fit_transform(X)
+    predictions = predict_apnea_per_segment(X_c)
+    dict_all = {}
+    dict_all['ecg'] = ecg_wind
+    dict_all['predictions'] = predictions
+    return dict_all

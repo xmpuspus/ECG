@@ -11,6 +11,10 @@ import itertools
 from imblearn.over_sampling import SMOTE
 from biosppy.signals import ecg
 import sensorlib.freq as slf
+from biosppy.signals import ecg as ecgsig
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from scipy.interpolate import interp1d
 
 
 ## process ECG signal 
@@ -370,3 +374,75 @@ def ecg_beats(sig, rpeaks, fs, dt = 100e-3):
     beats = [(r, sig[int(r - width): int(r + width)]) for r in rpeaks 
              if ((r - width) >0 and (r + width)< len(sig))]
     return beats
+
+
+
+##############################################################
+##############################################################
+##############################################################
+
+
+def EDR_all(ecgs, rpeaks_idxs, peak_count_nz):
+    EDR_list = []
+    for i in range(rpeaks_idxs.shape[0]):
+        
+        cs_rpeak = interp1d(rpeaks_idxs[i], ecgs[i][rpeaks_idxs[i]])
+        min_x = np.min(rpeaks_idxs[i])
+        max_x = np.max(rpeaks_idxs[i])
+        n = np.max(peak_count_nz)
+        t = np.linspace(min_x, max_x, n)
+        edr_ = cs_rpeak(t)
+        edr_ -= np.mean(edr_) #center the signal
+        #edr_, _ = edr(ecgs[i], rpeaks_idxs[i])
+        EDR_list.append(edr_)
+    EDR = np.array(EDR_list)
+    return EDR
+def iqr(x):
+    q75, q25 = np.percentile(x, [75 ,25])
+    iqr = q75 - q25
+    return iqr
+
+def mad(x):
+    mean_x = np.mean(x)
+    mean_adj = np.abs(x - mean_x)
+    return np.mean(mean_adj)
+def sample_entropy(a):
+    return np.abs(a[2] - a).max(axis=0)
+
+def segment_ecg(ecg, segment_size = 60, f = 100):
+    ecg[ecg < 0.01] = 0.01
+    ecg_len = ecg.shape
+    divs =int(ecg_len[0] /(segment_size * f))
+    ecg_new = baseline_correct(ecg, f)
+    windowed_ecg = np.array_split(ecg_new[:divs * segment_size * f], divs)  
+    return np.array([i for i in windowed_ecg if len(i) == len(windowed_ecg[0])])
+    
+def calculate_features(ecg_wind, rpeaks, peak_count_new, RR_int, f = 100):
+    n = 5e-2  #in seconds
+    edr_sig = EDR_all(ecg_wind, rpeaks, peak_count_new)
+    mean_RR = np.array(list(map(np.mean, RR_int)))
+    std_RR = np.array(list(map(np.std, RR_int)))
+    NN50_1 = np.array([np.sum(np.diff(i) < f*n) for i in RR_int])
+    NN50_2 = np.array([np.sum(np.diff(i) > f*n) for i in RR_int])
+    pNN50_1 = np.divide(NN50_1, peak_count_new, dtype = float)
+    pNN50_2 = np.divide(NN50_2, peak_count_new, dtype = float)
+    max_RR = np.array(list(map(np.max, RR_int)))
+    min_RR = np.array(list(map(np.min, RR_int)))
+    SDSD = np.array(list(map(np.std, np.array([np.diff(i) for i in RR_int]))))
+    median_RR = np.array(list(map(np.median, RR_int)))
+    RMSSD = np.array(list(map(lambda x: np.sqrt(np.mean(np.square(x))), np.array([np.diff(i) for i in RR_int]))))
+    iqr_RR = np.array(list(map(iqr, RR_int)))
+    mad_RR = np.array(list(map(mad, RR_int)))
+    sp_RRint = np.array(list(map(sample_entropy, RR_int)))
+    psd = np.array(list(map(lambda x: np.abs(np.fft.fft(x)), edr_sig)))
+    mean_EDR = np.array(list(map(np.mean, edr_sig)))
+    std_EDR = np.array(list(map(np.std, edr_sig)))
+    sp_EDR = np.array(list(map(sample_entropy, edr_sig)))
+    #PCA
+    pca = PCA(n_components=20)
+    EDR_new = pca.fit_transform(edr_sig)
+    psd_new = pca.fit_transform(psd)
+    X = np.column_stack([peak_count_new, mean_RR, std_RR, NN50_1, NN50_2, pNN50_1, pNN50_2, EDR_new, psd_new, \
+                    mean_EDR, std_EDR, sp_EDR, sp_RRint, max_RR, min_RR, SDSD, median_RR, RMSSD, mad_RR, iqr_RR])
+    
+    return X
