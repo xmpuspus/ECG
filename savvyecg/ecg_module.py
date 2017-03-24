@@ -113,11 +113,43 @@ pac_pvc_bbbb_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/PAC
 apnea_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/Apnea_Classifier.sav')
 
 def predict_vfib_per_beat(beat):
+    """
+    Predict VFIB or Not from a single beat
+    
+    Parameters
+    ----------
+    beat: array_like
+        1D Array containing amplitude a single beat ECG signal
+       
+    Returns
+    -------
+    prediction: str
+        'V' if VFIB and 'N' if not
+        
+    """ 
     prediction = vfib_model.predict(beat)
     return prediction
     
     
 def predict_vfib(ecg, f = 250):
+    """
+    Predict VFIB or not for all segments of ECG
+    
+    Parameters
+    ----------
+    ecg: array_like
+        2D Array containing amplitude all segments of the ECG signal
+        
+    f: float, optional
+        Number corresponding to the sampling frequency of the input signal,
+        must be in Hertz
+             
+    Returns
+    -------
+    dict_all: Dictionary
+        Dictionary of ECG beats and its corresponding PCA beats and predictions
+        
+    """
     window = int(f * 0.4) #800ms beat
     ecg_new = baseline_correct(ecg, f)
     rpeaks = np.array(ecgsig.hamilton_segmenter(ecg_new, f)['rpeaks'])[2:-2] #detect rpeaks from ecg
@@ -134,11 +166,43 @@ def predict_vfib(ecg, f = 250):
     return dict_all
 
 def predict_afib_per_beat(beat):
+    """
+    Predict AFIB or Not from a single beat
+    
+    Parameters
+    ----------
+    beat: array_like
+        1D Array containing amplitude a single beat ECG signal
+       
+    Returns
+    -------
+    prediction: str
+        '1' if AFIB and '0' if not
+        
+    """ 
     prediction = afib_model.predict(beat)
     return prediction
 
 
 def predict_afib(ecg, f = 120):
+    """
+    Predict AFIB or not for all segments of ECG
+    
+    Parameters
+    ----------
+    ecg: array_like
+        2D Array containing amplitude all segments of the ECG signal
+        
+    f: float, optional
+        Number corresponding to the sampling frequency of the input signal,
+        must be in Hertz
+             
+    Returns
+    -------
+    dict_all: Dictionary
+        Dictionary of ECG beats and its corresponding PCA beats and predictions
+        
+    """
     window = int(f * 0.4) #800ms beat
     ecg_new = baseline_correct(ecg, f)
     rpeaks = np.array(ecgsig.hamilton_segmenter(ecg_new, f)['rpeaks'])[2:-2] #detect rpeaks from ecg
@@ -156,11 +220,47 @@ def predict_afib(ecg, f = 120):
 
 
 def predict_pac_pvc_bbbb_per_beat(beat):
+    """
+    Predict between PAC, PVC, BBBB and Normal beat.
+    
+    Parameters
+    ----------
+    beat: array_like
+        1D Array containing amplitude a single beat ECG signal
+       
+    Returns
+    -------
+    prediction: array_like
+        [1, 0, 0, 0] if Normal Beat, 
+        [0, 1, 0, 0] if PAC Beat,
+        [0, 0, 1, 0] if BBBB Beat,
+        [0, 0, 0, 1] if PVC Beat
+        
+    """ 
     prediction = pac_pvc_bbbb_model.predict(beat)
     return prediction
 
 
 def predict_pac_pvc_bbbb(ecg, f = 250):
+    """
+    Predict Apnea for all segments of ECG
+    
+    Parameters
+    ----------
+    ecg: array_like
+        2D Array containing amplitude all segments of the ECG signal
+        
+    f: float, optional
+        Number corresponding to the sampling frequency of the input signal,
+        must be in Hertz
+             
+    Returns
+    -------
+    dict_all: Dictionary
+        Dictionary of ECG beats and its corresponding PCA beats and predictions
+        
+    """ 
+    
     window = int(f * 0.4) #800ms beat
     ecg_new = baseline_correct(ecg, f)
     rpeaks = np.array(ecgsig.hamilton_segmenter(ecg_new, f)['rpeaks'])[2:-2] #detect rpeaks from ecg
@@ -176,11 +276,47 @@ def predict_pac_pvc_bbbb(ecg, f = 250):
     return dict_all
 
 def predict_apnea_per_segment(segment):
+    """
+    Predict Apnea or Not from a single ECG segment
+    
+    Parameters
+    ----------
+    beat: array_like
+        1D Array containing amplitude a single segment of ECG signal
+       
+    Returns
+    -------
+    prediction: str
+        '1' if Apnea and '0' if not
+        
+    """ 
     prediction = apnea_model.predict(segment)
     return prediction
 
 
 def predict_apnea(ecg, f = 100, segment_size = 60):
+    """
+    Predict Apnea for all segments of ECG
+    
+    Parameters
+    ----------
+    ecg: array_like
+        2D Array containing amplitude all segments of the ECG signal
+        
+    f: float, optional
+        Number corresponding to the sampling frequency of the input signal,
+        must be in Hertz
+        
+    segment_size: int, optional 
+        Specifies segment length (15-sec, 30-sec, or 60-sec)
+        
+       
+    Returns
+    -------
+    dict_all: Dictionary
+        Dictionary of ECG segments and its corresponding predictions
+        
+    """ 
     
     window = int(f * segment_size) #800ms beat
     ecg_wind  = segment_ecg(ecg, segment_size = segment_size, f = f)
@@ -189,7 +325,7 @@ def predict_apnea(ecg, f = 100, segment_size = 60):
     peak_count = np.array([len(i) for i in rpeaks])
     
     #remove segments without detectable rpeaks
-    n_peaks = 30
+    n_peaks = segment_size/2
     ecg_wind = ecg_wind[np.where(peak_count > n_peaks)]
     RR_int = RR_int[np.where(peak_count > n_peaks)]
     rpeaks = rpeaks[np.where(peak_count > n_peaks)]
