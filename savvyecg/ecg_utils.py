@@ -16,6 +16,8 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+from scipy.stats import skew, kurtosis, signaltonoise, entropy
+from sklearn.metrics import confusion_matrix
 
 ## process ECG signal 
 
@@ -696,3 +698,211 @@ def calculate_features(ecg_wind, rpeaks, peak_count_new, RR_int, f = 100):
                     mean_EDR, std_EDR, sp_EDR, sp_RRint, max_RR, min_RR, SDSD, median_RR, RMSSD, mad_RR, iqr_RR])
     
     return X
+
+
+## signal quality features
+
+
+def filter_flat_sigs(sig, annot = None, std_tol = 1e-12):
+    sigs_filtered = sig[np.nanstd(sig, axis = 1) > std_tol]
+    if annot is None:
+        return sigs_filtered
+    else:
+        annot_filtered = annot[np.nanstd(sig, axis = 1) > std_tol]
+        return sigs_filtered, annot_filtered
+        
+
+def match_beat_annot(sig, rpeaks, annot, fs, dt = 100e-3):
+    width = int(dt * fs)
+    total_time = len(sig)/fs
+    annotations = np.array(['']*len(sig))
+    annotations[rpeaks] = annot
+    
+    beat_annot = np.array([annotations[r] for r in rpeaks if ((r - width) >0 and (r + width)< len(sig))])
+    return beat_annot
+
+def rel_power(ecg_sig, fs, num_freqbounds = (5, 15), denom_freqbounds = (5, 40)):
+    powerspec = ss.periodogram(ecg_sig, fs)
+    numerator = np.trapz((powerspec[1])[(powerspec[0] >= num_freqbounds[0]) * (powerspec[0] <=num_freqbounds[1])], 
+                         dx = powerspec[0][1] - powerspec[0][0])
+    denominator = np.trapz((powerspec[1])[(powerspec[0] >= denom_freqbounds[0]) * (powerspec[0] <=denom_freqbounds[1])], 
+                           dx = powerspec[0][1] - powerspec[0][0])
+    return numerator/denominator
+
+def power_spec(ecg_sig, fs, bins = 5, fmax = 5):
+    ecg_sig -= np.nanmean(ecg_sig)
+    a, b = ss.periodogram(ecg_sig, fs = fs)
+    b[0] = 0
+    b = b/np.max(b)
+    b = b[a<fmax] 
+    a = a[a<fmax]
+    
+    return np.sum(np.reshape(b, (bins, -1)), axis = 1) 
+
+def sig_energy(ecg_sig):
+    ecg_sig -= np.nanmean(ecg_sig)
+    ecg_sig /= np.max(abs(ecg_sig))
+    energy = np.sum(np.square(ecg_sig))
+    return energy
+
+def permutation_entropy(time_series, m, delay):
+    n = len(time_series)
+    permutations = np.array(list(itertools.permutations(range(m))))
+    c = [0] * len(permutations)
+
+    for i in range(n - delay * (m - 1)):
+        sorted_index_array = np.array(np.argsort(time_series[i:i + delay * m:delay], kind='quicksort'))
+        for j in range(len(permutations)):
+            if abs(permutations[j] - sorted_index_array).any() == 0:
+                c[j] += 1
+
+    c = [element for element in c if element != 0]
+    p = np.divide(np.array(c), float(sum(c)))
+    pe = -sum(p * np.log(p))
+    return pe
+
+def normal_hr(sig, fs=360):
+    stdv = np.std(sig)
+    samp_clip = np.clip(sig, -stdv*0.7, stdv*0.7)
+    samp_smt = smooth(samp_clip, fs, order = 6, corner_freq_hz=2)
+    
+    #first derivative
+    ss_fd = ss.savgol_filter(samp_smt, window_length=7, polyorder=5, deriv=1)
+
+    #power spectral density
+    psd_1, psd_2 = ss.periodogram(ss_fd, fs)
+    fnhr = psd_1[np.argmax(psd_2)]
+    return fnhr
+
+def rtor_duration(r_peaks, fs, unit = 'ms'):
+    multiplier = {'s': 1, 'ms': 1000}    
+    time_peaks = r_peaks/fs
+    dt = time_peaks[1:] - time_peaks[:-1]
+    rtor = np.mean(dt)*multiplier[unit]
+    return rtor
+
+
+down_sampler = pd.read_pickle("/Users/eventura/Documents/git-repos/ecg_research/data/signal_quality/pca_200msbeat.p")
+
+def pca_feature(beats, top_comp = 5):
+    beat_length = beats.shape[1]
+    if beat_length < down_sampler.n_components:
+        f_out = interp1d(np.arange(beat_length), beats, axis=1)
+        beats = f_out(np.linspace(0, beat_length-1, down_sampler.n_components))
+    
+    beats_pca = down_sampler.transform(beats)
+    pca_comps = np.mean(np.sum(beats_pca[:, :top_comp], axis = 1)/np.sum(beats_pca, axis = 1))
+    return pca_comps
+
+def mean_beat_energy(beats):
+    beats /= np.max(np.ndarray.flatten(beats))
+    energy = np.square(beats).sum(axis = 1)
+    mean_energy = np.mean(energy)
+    return mean_energy
+
+def rms(x):
+    return np.sqrt(np.mean(np.square(x)))
+
+def maxmin_beat(beats):
+    beats /= np.max(np.ndarray.flatten(beats))
+    maxmin = np.max(beats, axis=1) - np.min(beats, axis=1)
+    return np.mean(maxmin)
+
+def sum_beat_energy(beats):
+    beats /= np.max(np.ndarray.flatten(beats))
+    return np.sum(np.square(np.sum(beats, axis=0)))
+
+
+def get_features(df_, fs):    
+    
+    df = pd.DataFrame.copy(df_)
+    
+    print('Computing features...'),
+    # features from statistics of magnitude of ECG signal
+    df.loc[:, 'f_stddev'] = df.processed.apply(lambda x: np.nanstd(x))
+    df.loc[:, 'f_kurtosis'] = df.processed.apply(lambda x: kurtosis(x))
+    df.loc[:, 'f_skewness'] = df.processed.apply(lambda x: skew(x))
+    df.loc[:, 'f_rms'] = df.processed.apply(lambda x: rms(x))
+    df.loc[:, 'f_energy'] = df.processed.apply(lambda x: sig_energy(x))
+
+    # features from power spectrum of signal
+    df.loc[:, 'f_relpower'] = df.processed.apply(lambda x: rel_power(x, fs))
+    df.loc[:, 'f_relbasepower'] = df.processed.apply(lambda x: rel_power(x, fs, num_freqbounds=(1, 40), 
+                                                                  denom_freqbounds = (0, 40)))
+    fbins, fmax = 10, 10
+    powspec_vals = np.vstack(df.processed.apply(lambda x: power_spec(x, fs, bins=fbins, fmax=fmax)).values)
+    for i in range(fbins):
+        df.loc[:, 'f_powspec'+str(i)] = list(powspec_vals[:, i])
+
+    
+    # features from physiological parameters
+    df.loc[:, 'f_rpeakcount'] = df.r_peaks.map(len)
+    df.loc[:, 'f_nhr'] =  df.processed.apply(lambda x: normal_hr(x, fs))
+    df.loc[:, 'f_hrv'] =  df.r_peaks.apply(lambda x: heart_rate_var(x, fs))
+    df.loc[:, 'f_rtor'] =  df.r_peaks.apply(lambda x: rtor_duration(x, fs))
+    df.loc[:, 'f_rr'] = df.apply(lambda x: [x.processed, x.r_peaks], axis = 1).apply(lambda x: edr(x[0],x[1]))\
+                          .apply(lambda x: resp_rate(x[0], fs))
+        
+    df.loc[:, 'f_sumbe'] = df.beats.apply(lambda x: sum_beat_energy(np.array(x)))
+        
+    df.loc[:, 'f_pca'] = 0
+    df.loc[df.beats.map(len)>0, 'f_pca'] = df.beats[df.beats.map(len)>0].apply(lambda x:pca_feature(np.array(x)))
+    
+#    df.loc[:, 'f_mbe'] = 0
+    df.loc[df.beats.map(len)>0, 'f_mbe'] = df.beats[df.beats.map(len)>0].apply(lambda x: mean_beat_energy(np.array(x)))
+    
+    df.loc[:, 'f_maxminbeat'] = 0
+    df.loc[df.beats.map(len)>0, 'f_maxminbeat'] = df.beats[df.beats.map(len)>0].apply(lambda x: maxmin_beat(np.array(x)))
+     
+    print('Done!')
+
+    return df
+
+def smote_all_minority(train_set, train_label):
+    sm = SMOTE(kind='regular')
+
+    majority = max(set(train_label), key=list(train_label).count)
+    major_index = np.where(train_label==majority)[0]
+    minorities = list(set(train_label) - set([majority]))
+    
+    majority_data = train_set[major_index, :]
+    majority_labels = train_label[major_index]
+    
+    oversampled_data = {majority: majority_data}
+    oversampled_labels = {majority: majority_labels}
+    
+    for i in minorities:
+        minor_index = np.where(train_label==i)[0]
+        reduced_features = np.concatenate((train_set[major_index, :], train_set[minor_index, :]))
+        reduced_labels = np.concatenate((train_label[major_index], train_label[minor_index]))  
+        train_set_smote, train_label_smote = sm.fit_sample(reduced_features, reduced_labels)
+        
+        new_minor_index = np.where(train_label_smote==i)[0]
+
+        oversampled_data[i] = train_set_smote[new_minor_index, :]
+        oversampled_labels[i] = train_label_smote[new_minor_index]
+        
+    return oversampled_data, oversampled_labels
+
+
+def conf_mat_params_binary(true_labels, prediction):
+    num_pos = np.sum(true_labels)
+    num_neg = len(true_labels) - num_pos
+    
+    confmat = confusion_matrix(true_labels, prediction)
+
+    tn, fp, fn, tp = np.ndarray.flatten(confmat)
+    sens = tp/num_pos
+    spec = tn/num_neg
+    fpr = 1-spec
+    fnr = 1-sens
+    acc = (tp+tn)/len(true_labels)
+    
+    out_dict = {'confmat': confmat,
+                'accuracy': acc,
+                'sensitivity': sens,
+                'specificity': spec,
+                'falsepositiverate': fpr,
+                'falsenegativerate': fnr}
+    return out_dict
+
