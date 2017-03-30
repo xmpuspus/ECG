@@ -782,7 +782,7 @@ def rtor_duration(r_peaks, fs, unit = 'ms'):
     return rtor
 
 
-down_sampler = pd.read_pickle("/Users/eventura/Documents/git-repos/ecg_research/data/signal_quality/pca_200msbeat.p")
+down_sampler = pd.read_pickle("../data/signal_quality/pca_200msbeat.p")
 
 def pca_feature(beats, top_comp = 5):
     beat_length = beats.shape[1]
