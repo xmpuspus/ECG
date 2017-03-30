@@ -107,10 +107,10 @@ class Signal():
 ###################################################
 
 #Models
-vfib_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/VFIB_Classifier.sav')
-afib_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/AFIB_Classifier.sav')
-pac_pvc_bbbb_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/PAC_PVC_BBBB_Classifier.sav')
-apnea_model = jl.load('/Users/user/Documents/ecg_research/Classifiers/Apnea_Classifier.sav')
+vfib_model = jl.load('../Classifiers/VFIB_Classifier.sav')
+afib_model = jl.load('../Classifiers/AFIB_Classifier.sav')
+pac_pvc_bbbb_model = jl.load('../Classifiers/PAC_PVC_BBBB_Classifier.sav')
+apnea_model = jl.load('../Classifiers/Apnea_Classifier.sav')
 
 def predict_vfib_per_beat(beat):
     """
