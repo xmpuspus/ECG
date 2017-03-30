@@ -9,7 +9,6 @@ import seaborn as sns
 from scipy.ndimage import convolve1d
 import itertools
 from imblearn.over_sampling import SMOTE
-from biosppy.signals import ecg
 import sensorlib.freq as slf
 from biosppy.signals import ecg as ecgsig
 from sklearn.decomposition import PCA
@@ -133,11 +132,11 @@ def r_peak_loc(x, fs):
         Array containing the R-peak locations in the array
         
     """
-    rloc = ecg.hamilton_segmenter(x, fs)['rpeaks']
+    rloc = ecgsig.hamilton_segmenter(x, fs)['rpeaks']
     return rloc
 
 
-def ecg_beats(sig, rpeaks, fs, dt = 100e-3):
+def ecg_beatsstack(sig, rpeaks, fs, dt = 100e-3):
     """
     Gives an array of ECG beats
     
