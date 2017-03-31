@@ -839,7 +839,7 @@ def get_features(df_, fs):
     df.loc[:, 'f_nhr'] =  df.processed.apply(lambda x: normal_hr(x, fs))
     df.loc[:, 'f_hrv'] =  df.r_peaks.apply(lambda x: heart_rate_var(x, fs))
     df.loc[:, 'f_rtor'] =  df.r_peaks.apply(lambda x: rtor_duration(x, fs))
-    df.loc[:, 'f_rr'] = df.apply(lambda x: [x.processed, x.r_peaks], axis = 1).apply(lambda x: edr(x[0],x[1]))\
+    df.loc[:, 'f_rr'] = df.apply(lambda x: [x.processed, x.r_peaks], axis = 1).apply(lambda x: edr(np.array(x[0]),x[1]))\
                           .apply(lambda x: resp_rate(x[0], fs))
         
     df.loc[:, 'f_sumbe'] = df.beats.apply(lambda x: sum_beat_energy(np.array(x)))
