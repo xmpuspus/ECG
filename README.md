@@ -50,10 +50,10 @@ The database itself can also be downloaded from Xavier Puspus (Cebu Office)
 
 ## Authors
 
-* **Maria Eloisa Ventura** - *
-* **Xavier Puspus** - *
+* **Maria Eloisa Ventura** - ECG Signal Quality and Pre-Processing
+* **Xavier Puspus** - Detection of CVDs and Sleep Apnea from ECG
 
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
+
 
 
 
