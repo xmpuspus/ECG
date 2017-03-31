@@ -29,7 +29,7 @@ Sleep Apnea [apnea-ecg](https://www.physionet.org/physiobank/database/apnea-ecg/
 
 
 
-### How to run the notebooks (*_demo and *_dev)
+### How to run the notebooks 
 
 Activate the correct python environment with:
 
@@ -44,6 +44,16 @@ jupyter notebook
 ```
 
 Running the dev notebooks should build the necessary databases within the local machine in order to run the demo notebooks. 
+
+The database itself can also be downloaded from Xavier Puspus (Cebu Office)
+
+
+## Authors
+
+* **Maria Eloisa Ventura** - *
+* **Xavier Puspus** - *
+
+See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
 
 
 
