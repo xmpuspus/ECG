@@ -86,7 +86,9 @@ class Signal():
         if get_beats:
             seg_beats = [ecg_beats(np.array(df_.ix[i].processed), seg_rpeaks[i], 
                                self.fs, dt=beat_duration) for i in df_.index.values]
-            self.segments_df['beats'] = seg_beats
+            self.segments_df['rpeak_beat_pair'] = seg_beats
+            self.segments_df['beats'] = [ecg_beatsstack(np.array(df_.ix[i].processed), seg_rpeaks[i], 
+                               self.fs, dt=beat_duration) for i in df_.index.values]                                        
             beats_rp = []
             beats_mag = []
             for b in seg_beats:
@@ -338,3 +340,50 @@ def predict_apnea(ecg, f = 100, segment_size = 60):
     dict_all['ecg'] = ecg_wind
     dict_all['predictions'] = predictions
     return dict_all
+
+
+sigqual_scaler = jl.load('../Classifiers/signalquality_featurescaler.p')
+sigqual_model = jl.load('../Classifiers/signalquality_classifier.p')
+
+def classify_signalquality(df_, fs, tol=1e-10):
+    df = pd.DataFrame.copy(df_)
+    required_cols = ['processed', 'r_peaks', 'beats']
+    colnames = df.columns.values
+    if np.sum(np.array([1 for r in required_cols if r in df.columns.values]))!=3:
+        print('Failed to classify quality of signal.Dataframe must contain the following columns: processed, r_peaks, beats.')
+        
+    else:
+        print('Processing...')
+        
+        # get index of signals which are flat (std = 0) and whose R peaks < 0
+        df_copy = df[df.beats.map(np.std)>1e-10]
+        df_copy = df_copy[df_copy.r_peaks.map(len)>1]
+        
+        filtered_index = df_copy.index.values
+        bad_index = np.array([i for i in df.index.values if i not in filtered_index])
+        
+        # compute features
+        filtered_df = df.iloc[filtered_index, :]
+        processedfeatures_df = get_features(filtered_df, fs)
+        
+        feature_names = [col for col in list(processedfeatures_df.keys()) if col[:2] == 'f_']
+        features_df = processedfeatures_df.filter(feature_names)
+        
+        features = np.copy(features_df.values)
+        
+        xtest = sigqual_scaler.transform(features)
+        prediction = sigqual_model.predict(xtest)
+        
+        df.loc[:, 'quality'] = 0
+        df.loc[filtered_index, 'quality'] = list(prediction)
+        
+        return df
+        
+        
+        
+        
+        
+        
+        
+    
+    
