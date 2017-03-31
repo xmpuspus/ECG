@@ -1,11 +1,11 @@
-# ecg_research
+# ECG Research
+
+### Description
+
+ Automated detection of various cardiovascular diseases and sleep apnea using a single-lead electrocardiogram
 
 This repository contains the works and research done to develop tools to compute some of the physiological features that could be derived from the electrocardiogram (ECG) signal. 
 
-
-# $ {1:ECG Research}
-
- Automated detection of various cardiovascular diseases and sleep apnea using a single-lead electrocardiogram
 
 ### Setup
 
@@ -22,16 +22,14 @@ source activate ecg
 
 For running the *_dev.nb files for predicting various cardiovascular diseases and sleep apnea, the databases can be found in these links: 
 
-PAC/PVC/BBB Detection [INCARTDB](https://www.physionet.org/pn3/incartdb/)
-VFIB Detection [CUDB](https://physionet.org/physiobank/database/cudb/)
-AFIB Detection [LTAFDB](https://physionet.org/physiobank/database/ltafdb/)
-Sleep Apnea [apnea-ecg](https://www.physionet.org/physiobank/database/apnea-ecg/)
+PAC/PVC/BBB Detection [INCARTDB](https://www.physionet.org/pn3/incartdb/)  
+VFIB Detection [CUDB](https://physionet.org/physiobank/database/cudb/)  
+AFIB Detection [LTAFDB](https://physionet.org/physiobank/database/ltafdb/)  
+Sleep Apnea [apnea-ecg](https://www.physionet.org/physiobank/database/apnea-ecg/)  
 
 
 
-
-
-### How to run dev
+### How to run the notebooks (*_demo and *_dev)
 
 Activate the correct python environment with:
 
