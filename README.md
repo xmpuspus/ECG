@@ -23,7 +23,7 @@ source activate ecg
 
 For running the *_dev.nb files for predicting various cardiovascular diseases and sleep apnea, the databases can be found in these links: 
 
-Signal Quality (good or bad ECG beat) Detection [signal_quality](https://physionet.org/physiobank/database/challenge/2011/)
+Signal Quality (good or bad ECG beat) Detection [signal_quality](https://physionet.org/physiobank/database/challenge/2011/)  
 PAC/PVC/BBB Detection [INCARTDB](https://www.physionet.org/pn3/incartdb/)  
 VFIB Detection [CUDB](https://physionet.org/physiobank/database/cudb/)  
 AFIB Detection [LTAFDB](https://physionet.org/physiobank/database/ltafdb/)  
