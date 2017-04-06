@@ -105,7 +105,7 @@ dependencies:
   - sensorlib==1.0.14
   - sklearn==0.0
   - sqlalchemy==1.0.14
-  - statsmodels==0.6.1
+  - statsmodels==0.8.0
   - theano==0.8.2
   - toolz==0.8.0
   - wfdb==0.1.2
