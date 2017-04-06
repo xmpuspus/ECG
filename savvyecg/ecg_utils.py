@@ -703,6 +703,27 @@ def calculate_features(ecg_wind, rpeaks, peak_count_new, RR_int, f = 100):
 
 
 def filter_flat_sigs(sig, annot = None, std_tol = 1e-12):
+    """
+    Removes rows from an array whose standard deviation is less 
+    than tolerance value
+    
+    Parameters
+    ----------
+    sig: array_like
+        Array containing magnitude of ECG signal    
+    
+    annot: array_like, optional
+        Annotations    
+
+    std_tol: float, optional
+        Tolerance value for zero
+        
+    Returns
+    -------
+    sigs_filtered: array_like
+        Array whose rows have standard deviation greater than tolerance value
+    """
+    
     sigs_filtered = sig[np.nanstd(sig, axis = 1) > std_tol]
     if annot is None:
         return sigs_filtered
@@ -712,6 +733,33 @@ def filter_flat_sigs(sig, annot = None, std_tol = 1e-12):
         
 
 def match_beat_annot(sig, rpeaks, annot, fs, dt = 100e-3):
+    """
+    Filters beat annotations for a signal (e.g. from Physionet)
+    that matches the location of R peaks
+    
+    Parameters
+    ----------
+    sig: array_like
+        Array containing magnitude of ECG signal    
+   
+    rpeaks: array_like
+        Array containing indices of the R peaks in the segmented ECG signal  
+    
+    annot: array_like
+        Annotations
+        
+    fs: float
+        Sampling rate of signal (must be in Hertz)
+
+    dt: float
+        Half of beat duration
+    
+    Returns
+    -------
+    beat_annot: array_like
+        Annotations that matched the R peak locations
+    """
+        
     width = int(dt * fs)
     total_time = len(sig)/fs
     annotations = np.array(['']*len(sig))
@@ -721,14 +769,61 @@ def match_beat_annot(sig, rpeaks, annot, fs, dt = 100e-3):
     return beat_annot
 
 def rel_power(ecg_sig, fs, num_freqbounds = (5, 15), denom_freqbounds = (5, 40)):
+    """
+    Computes relative power of a signal
+    
+    Parameters
+    ----------
+    ecg_sig: array_like
+        Array containing magnitude of ECG signal    
+
+    fs: float
+        Sampling rate of signal (must be in Hertz)
+    
+    num_freqbounds: tuple, optional
+        tuple of frequencies (in Hertz) corresponding to the bandwidth of interest
+        
+    denom_freqbounds: tuple, optional
+        tuple of frequencies (in Hertz) corresponding to the bandwidth of interest        
+    
+    Returns
+    -------
+    relpwr: float 
+        relative power contained in the range of frequencies with respect to the 
+        range of denominator frequencies
+    """
+            
     powerspec = ss.periodogram(ecg_sig, fs)
     numerator = np.trapz((powerspec[1])[(powerspec[0] >= num_freqbounds[0]) * (powerspec[0] <=num_freqbounds[1])], 
                          dx = powerspec[0][1] - powerspec[0][0])
     denominator = np.trapz((powerspec[1])[(powerspec[0] >= denom_freqbounds[0]) * (powerspec[0] <=denom_freqbounds[1])], 
-                           dx = powerspec[0][1] - powerspec[0][0])
-    return numerator/denominator
+                           dx = powerspec[0][1] - powerspec[0][0])    
+    relpwr = numerator/denominator
+    return relpwr
 
 def power_spec(ecg_sig, fs, bins = 5, fmax = 5):
+    """
+    
+    Parameters
+    ----------
+    ecg_sig: array_like
+        Array containing magnitude of ECG signal    
+
+    fs: float
+        Sampling rate of signal (must be in Hertz)
+
+    bins: int, optional
+        Number of frequency bins
+        
+    fmax: float, optional
+        Maximum frequency in the power spectrum
+        
+    Returns
+    -------
+    pwrspec: array_like
+        array of magnitudes of power spectrum for the frequency bins set
+    """
+        
     ecg_sig -= np.nanmean(ecg_sig)
     a, b = ss.periodogram(ecg_sig, fs = fs)
     b[0] = 0
@@ -736,15 +831,50 @@ def power_spec(ecg_sig, fs, bins = 5, fmax = 5):
     b = b[a<fmax] 
     a = a[a<fmax]
     
-    return np.sum(np.reshape(b, (bins, -1)), axis = 1) 
+    pwrspec = np.sum(np.reshape(b, (bins, -1)), axis = 1) 
+    return pwrspec
 
 def sig_energy(ecg_sig):
+    """
+    Computes the energy of the signal
+    
+    Parameters
+    ----------
+    ecg_sig: array_like
+        Array containing magnitude of ECG signal
+    
+    Returns
+    -------
+    energy: float
+        Number that refers to the signal energy
+    """
+            
     ecg_sig -= np.nanmean(ecg_sig)
     ecg_sig /= np.max(abs(ecg_sig))
     energy = np.sum(np.square(ecg_sig))
     return energy
 
 def permutation_entropy(time_series, m, delay):
+    """
+    Calculates permutation entropy of a time series
+    
+    Parameters
+    ----------
+    time_series: array_like
+        Time series signal
+        
+    m: int
+        Determines number of accessible states
+        
+    delay: float
+        time lag
+    
+    Returns
+    -------
+    pe: float
+        value of permutation entropy of the time series
+    """
+            
     n = len(time_series)
     permutations = np.array(list(itertools.permutations(range(m))))
     c = [0] * len(permutations)
@@ -761,6 +891,23 @@ def permutation_entropy(time_series, m, delay):
     return pe
 
 def normal_hr(sig, fs=360):
+    """
+    Returns the estimate of normal heart rate
+   
+    Parameters
+    ----------
+    sig: array_like
+        Contains magnitude of ECG signal
+
+    fs: float
+        Number corresponding to the sampling frequency of the input signal,
+        must be in Hertz
+                 
+    Returns
+    -------
+    fnhr: float 
+        Normal heart rate value
+    """
     stdv = np.std(sig)
     samp_clip = np.clip(sig, -stdv*0.7, stdv*0.7)
     samp_smt = smooth(samp_clip, fs, order = 6, corner_freq_hz=2)
@@ -774,6 +921,27 @@ def normal_hr(sig, fs=360):
     return fnhr
 
 def rtor_duration(r_peaks, fs, unit = 'ms'):
+    """
+    Returns the mean duration between two R peaks
+    
+    Parameters
+    ----------
+    r_peaks: array_like
+        Contains magnitude of ECG beats where each row is a beat
+
+    fs: float
+        Sampling rate of signal (must be in Hertz)
+       
+    unit: string, optional 
+        Specifies unit of heart rate ('s' refers to second,
+        and 'ms' refers to millisecond)
+        
+    Returns
+    -------
+    rtor: float
+        Mean duration between two R peaks
+    
+    """          
     multiplier = {'s': 1, 'ms': 1000}    
     time_peaks = r_peaks/fs
     dt = time_peaks[1:] - time_peaks[:-1]
@@ -784,6 +952,24 @@ def rtor_duration(r_peaks, fs, unit = 'ms'):
 down_sampler = pd.read_pickle("../data/signal_quality/pca_200msbeat.p")
 
 def pca_feature(beats, top_comp = 5):
+    """
+    Returns the mean of the top principal components of ECG beats
+    
+    Parameters
+    ----------
+    beats: array_like
+        Contains magnitude of ECG beats where each row is a beat
+    
+    top_comp: int, optional
+        Number of principal components
+        
+    Returns
+    -------
+    pca_comps: array_like
+        Array containing the mean of the top principal components
+    
+    """
+    
     beat_length = beats.shape[1]
     if beat_length < down_sampler.n_components:
         f_out = interp1d(np.arange(beat_length), beats, axis=1)
@@ -794,25 +980,102 @@ def pca_feature(beats, top_comp = 5):
     return pca_comps
 
 def mean_beat_energy(beats):
+    """
+    Computes the mean energy of beats
+    
+    Parameters
+    ----------
+    beats: array_like
+        Contains magnitude of ECG beats where each row is a beat
+     
+    Returns
+    -------
+    mean_energy: float
+        Mean of all beat energy
+    
+    """    
     beats /= np.max(np.ndarray.flatten(beats))
     energy = np.square(beats).sum(axis = 1)
     mean_energy = np.mean(energy)
     return mean_energy
 
 def rms(x):
-    return np.sqrt(np.mean(np.square(x)))
+    """
+    Computes root-mean-square value of signal
+    
+    Parameters
+    ----------
+    x: array_like
+        Contains magnitude of ECG signal
+     
+    Returns
+    -------
+    rms_val: float
+        root-mean-square value of input signal
+    
+    """
+    rms_val = np.sqrt(np.mean(np.square(x)))
+    return rms_val
 
 def maxmin_beat(beats):
+    """
+    Computes mean beat amplitude
+    
+    Parameters
+    ----------
+    beats: array_like
+        Contains magnitude of ECG beats where each row is a beat
+     
+    Returns
+    -------
+    maxmin: float
+        Mean beat amplitude
+    
+    """
     beats /= np.max(np.ndarray.flatten(beats))
-    maxmin = np.max(beats, axis=1) - np.min(beats, axis=1)
-    return np.mean(maxmin)
+    maxmin = np.mean(np.max(beats, axis=1) - np.min(beats, axis=1))
+    return maxmin
 
 def sum_beat_energy(beats):
+    """
+    Computes the sum of energy of beats
+    
+    Parameters
+    ----------
+    beats: array_like
+        Contains magnitude of ECG beats where each row is a beat
+     
+    Returns
+    -------
+    sumbe: float
+        Sum of all beat energy
+    
+    """
     beats /= np.max(np.ndarray.flatten(beats))
-    return np.sum(np.square(np.sum(beats, axis=0)))
+    sumbe = np.sum(np.square(np.sum(beats, axis=0))) 
+    return sumbe
 
 
-def get_features(df_, fs):    
+def get_features(df_, fs):
+    """
+    Calculates features to be used for ECG signal quality classification
+    
+    Parameters
+    ----------
+    df_: pandas dataframe
+        Dataframe of ECG data, must contain the following columns: 
+        processed, r_peaks, and beats
+
+    fs: float
+        Sampling rate of signal (must be in Hertz)
+        
+     
+    Returns
+    -------
+    df: pandas dataframe
+        Dataframe appended with computed features
+    """
+    
     
     df = pd.DataFrame.copy(df_)
     
@@ -858,6 +1121,28 @@ def get_features(df_, fs):
     return df
 
 def smote_all_minority(train_set, train_label):
+    """
+    Performs SMOTE (Synthetic Minority Oversampling TEchnique) on data
+    which matches the number of samples of the minority classes with the
+    majority class
+    
+    Parameters
+    ----------
+    train_set: array_like
+        Array containing the features along the columns, with each row 
+        corresponds to a sample 
+
+    train_label: array_like
+        Array containing the true labels
+
+    Returns
+    -------
+    oversampled_data: dictionary
+        Contains the balanced dataset/features with class label as index
+    oversampled_labels: dictionary
+        Contains the balanced dataset labels with class label as index
+    """
+    
     sm = SMOTE(kind='regular')
 
     majority = max(set(train_label), key=list(train_label).count)
@@ -885,6 +1170,26 @@ def smote_all_minority(train_set, train_label):
 
 
 def conf_mat_params_binary(true_labels, prediction):
+    """
+    Returns the confusion matrix and some derivable parameters 
+    for prediction of two classes
+    
+    Parameters
+    ----------
+    true_labels: array_like
+        Array containing the true labels
+
+    prediction: array_like
+        Array containing the prediction 
+        
+    Returns
+    -------
+    out_dict: dictionary
+        Contains the following results: 
+            confmat (2x2 array of confusion martix), accuracy, sensitivity, 
+            specificity, falsenegativerate, falsenegativerate
+        
+    """
     num_pos = np.sum(true_labels)
     num_neg = len(true_labels) - num_pos
     
@@ -904,4 +1209,3 @@ def conf_mat_params_binary(true_labels, prediction):
                 'falsepositiverate': fpr,
                 'falsenegativerate': fnr}
     return out_dict
-
